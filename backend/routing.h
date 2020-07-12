@@ -63,16 +63,19 @@ void bad_request(uint8_t sockfd);
 void root_response(uint8_t sockfd);
 void js_response(uint8_t sockfd);
 void css_response(uint8_t sockfd);
+void png_response(uint8_t sockfd);
 
 void init_routes(Route *init);
 uint8_t add_route(Route* new_route);
 uint8_t call_route(char* addr,uint8_t sockfd);
-uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size);
+uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,char* content_type);
 uint8_t key(char* addr);
 
 extern Route bad_route;
 extern Route route_root;
 extern Route route_js;
 extern Route route_css;
+extern Route route_png;
+
 
 #endif

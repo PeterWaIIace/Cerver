@@ -83,7 +83,8 @@ int main(int argc, char **argv){
     init_routes(&bad_route);
     add_route(&route_root);
     add_route(&route_js);
-    add_route(&route_css);   
+    add_route(&route_css);  
+    add_route(&route_png); 
     
     while(new_socket > 0){
 
