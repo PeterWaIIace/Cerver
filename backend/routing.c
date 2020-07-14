@@ -1,30 +1,16 @@
 #include "routing.h"
 
-Route bad_route = {.empty=-1, .addr="", .fnc_ptr=bad_request};
-Route route_root = {.empty=0, .addr="/", .fnc_ptr=root_response};
-Route route_js = {.empty=0, .addr="/script.js", .fnc_ptr=js_response};
-Route route_css = {.empty=0, .addr="/style.css", .fnc_ptr=css_response};
-Route route_png = {.empty=0, .addr="/water.png", .fnc_ptr=png_response};
-Route route_device = {.empty=0, .addr="/ReadDev", .fnc_ptr=device};
+Route bad_route = {.empty=-1, .request=GET , .addr="", .fnc_ptr=bad_request};
+Route route_root = {.empty=0, .request=GET , .addr="/", .fnc_ptr=root_response};
+Route route_js = {.empty=0,  .request=GET , .addr="/script.js", .fnc_ptr=js_response};
+Route route_css = {.empty=0, .request=GET , .addr="/style.css", .fnc_ptr=css_response};
+Route route_png = {.empty=0, .request=GET ,.addr="/water.png", .fnc_ptr=png_response};
+Route route_post_data = {.empty=0, .request=GET , .addr="/ReadDev", .fnc_ptr=get_data};
+Route route_get_data = {.empty=0, .request=POST , .addr="/ReadDev", .fnc_ptr=post_data};
 
-
-Request get_REST(char* ptr){
-    Request req;
-    ptr = strtok(ptr," ");
-    int n_req;
-    for(n_req=GET;n_req<=DELETE;n_req++){
-        if(0==strncmp(ptr,REST_STRING[n_req],sizeof(REST_STRING[n_req]))){
-            break;
-        }
-    }
-    req.request = n_req;
-    req.addr = strtok(NULL, " ");
-    req.length_addr = sizeof(req.addr);
-
-    return req;
-}
 
 void bad_request(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
+    printf("BAD REQUEST!:\n");
     response(sockfd,"404 NOT FOUND","",0,"text/html");
 }
 
@@ -33,7 +19,7 @@ void root_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size
     struct stat sb;
 
     fstat(fd,&sb);
-    
+    printf("ROOT:\n");
     char* rfile = mmap(NULL,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
     response(sockfd,"200 OK",rfile,sb.st_size,"text/html"); 
     munmap(rfile,sb.st_size);
@@ -88,35 +74,74 @@ void png_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_
     
 };
 
-void device(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
-    if(GET==request){
-        // get dev data
-        uint8_t buffsend[2] = {0,0};
-        get_ble_data(buffsend,2);
-        response(sockfd,"200 OK",buffsend,2,"text");
+
+void get_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
+    if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
+        queue_init(&data_queue,200);
     }
-    else if(POST==request){
-        // send to dev
-        uint8_t data = 0;
-        push_ble_data(&data,1);
-        response(sockfd,"200 OK","",0,"text");
-    }
+    // get dev data
+    bzero(request_content,length_data);
+    queue_pull(request_content,&length_data,&data_queue);
+
+    response(sockfd,"200 OK",request_content,length_data,"text");
+    
 }
 
+void post_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
+    if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
+        queue_init(&data_queue,200);
+    }
+    
+    printf("post data: %s\n\n",request_content);
+    queue_push(request_content,length_data,&data_queue);
+    
+    response(sockfd,"200 OK","",0,"text");
+}
+
+/*                                    LIBRARY PART                                                  */
+
+Request get_REST(char* ptr){
+    Request req;
+    
+    req.data=malloc(strlen(ptr));
+    strncpy(req.data,ptr,strlen(ptr));
+    req.length_data=strlen(ptr);
+
+    ptr = strtok(ptr," ");
+    int n_req;
+    for(n_req=GET;n_req<=DELETE;n_req++){
+        if(0==strncmp(ptr,REST_STRING[n_req],sizeof(REST_STRING[n_req]))){
+            break;
+        }
+    }
+    req.request = n_req;
+    req.addr = strtok(NULL, " ");
+    req.length_addr = sizeof(req.addr);
+    return req;
+}
 
 void init_routes(Route *init){
     for(uint8_t i = 0; i < MAX_ROUTES; i++){
         routes[i]=init;
     }
+
 }
 
-uint8_t key(char* addr){
-    uint32_t hash = 0;
-    for(uint8_t n = 0; n < strnlen(addr, MAX_ROUTE_LENGTH); n++){
-        hash+=addr[n];
-        hash*=addr[n];
+uint8_t key(uint8_t request,char* addr){
+    size_t len = strlen(addr)+1; // +1 because REST request has 1 byte and is added to key 
+    uint8_t buff[len],hash;
+    snprintf(buff,len,"%d:%s",request,addr);
+    hash=key2hash(buff,len);
+    return hash;
+}
+
+uint8_t key2hash(char* input,size_t len){
+    uint8_t hash = 0;
+    for(uint8_t n = 0; n < len-1; n++){
+        hash=hash+input[n];
+        hash=hash*input[n];
     }
-    hash%=MAX_ROUTES;
+    hash=hash%MAX_ROUTES;
     return hash;
 };
 
@@ -136,14 +161,16 @@ uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,
 
 uint8_t add_route(Route* new_route){
     if(new_route == NULL) return -1;
-    uint8_t hash = key(new_route->addr);
+    uint8_t hash = key(new_route->request,new_route->addr);
     if(routes[hash]->empty == 0) return -1;
     routes[hash] = new_route;
     return 0;
 };
 
+
 uint8_t call_route(char* addr,uint8_t sockfd,uint8_t request,uint8_t* request_content, size_t length_data){
-    uint8_t hash = key(addr);
+    uint8_t hash = key(request,addr);
     if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sockfd,request,request_content,length_data);
+    free(request_content);
     return 0;
 };

@@ -24,7 +24,6 @@
 #include <pthread.h>
 
 #include "routing.h"
-#include "blesock.h"
 
 #define PORT 8080
 
@@ -104,9 +103,10 @@ int main(int argc, char **argv){
     add_route(&route_js);
     add_route(&route_css);  
     add_route(&route_png); 
+    add_route(&route_post_data);
+    add_route(&route_get_data);
 
-    start_unixsocket();
-    // websock();      
+    websock();      
     
     return 0; 
 }

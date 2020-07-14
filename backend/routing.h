@@ -22,19 +22,19 @@
 #include <fcntl.h>
 
 #include <time.h>
-
-#include "blesock.h"
+#include "queue.h"
 
 #define MAX_ROUTES 200
 #define MAX_ROUTE_LENGTH 30
 #define MAX_HEADER_LENGTH 300
+#define MAX_REST_CMD_LENGTH 10
 
 #define FOREACH_REQ(REQ) \
         REQ(GET)   \
         REQ(POST)  \
         REQ(PUT)   \
         REQ(PATCH)  \
-        REQ(DELETE)  
+        REQ(DELETE)  \
 
 #define GENERATE_ENUM(ENUM) ENUM,
 #define ENUM2STR(STRING) #STRING,
@@ -53,6 +53,7 @@ struct Request{
 
 struct Route{
     int8_t empty; 
+    uint8_t request;
     char addr[MAX_ROUTE_LENGTH];
     void (*fnc_ptr)(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data); 
 }typedef Route;
@@ -66,19 +67,23 @@ void root_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,siz
 void js_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
 void css_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
 void png_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
-void device(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data);
+void get_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data);
+void post_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data);
+Queue* data_queue;
 
 void init_routes(Route *init);
 uint8_t add_route(Route* new_route);
 uint8_t call_route(char* addr,uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data);
 uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,char* content_type);
-uint8_t key(char* addr);
+uint8_t key(uint8_t request,char* addr);
+uint8_t key2hash(char* input,size_t len);
 
 extern Route bad_route;
 extern Route route_root;
 extern Route route_js;
 extern Route route_css;
 extern Route route_png;
-
+extern Route route_post_data;
+extern Route route_get_data;
 
 #endif
