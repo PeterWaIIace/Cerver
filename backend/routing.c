@@ -1,10 +1,12 @@
 #include "routing.h"
 
-Route bad_route = {.empty=-1,.addr="",.fnc_ptr=bad_request};
-Route route_root = {.empty=0,.addr="/",.fnc_ptr=root_response};
-Route route_js = {.empty=0,.addr="/script.js",.fnc_ptr=js_response};
-Route route_css = {.empty=0,.addr="/style.css",.fnc_ptr=css_response};
-Route route_png = {.empty=0,.addr="/water.png",.fnc_ptr=png_response};
+Route bad_route = {.empty=-1, .addr="", .fnc_ptr=bad_request};
+Route route_root = {.empty=0, .addr="/", .fnc_ptr=root_response};
+Route route_js = {.empty=0, .addr="/script.js", .fnc_ptr=js_response};
+Route route_css = {.empty=0, .addr="/style.css", .fnc_ptr=css_response};
+Route route_png = {.empty=0, .addr="/water.png", .fnc_ptr=png_response};
+Route route_device = {.empty=0, .addr="/ReadDev", .fnc_ptr=device};
+
 
 Request get_REST(char* ptr){
     Request req;
@@ -22,11 +24,11 @@ Request get_REST(char* ptr){
     return req;
 }
 
-void bad_request(uint8_t sockfd){
+void bad_request(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
     response(sockfd,"404 NOT FOUND","",0,"text/html");
 }
 
-void root_response(uint8_t sockfd){
+void root_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
     uint8_t fd = open("../www/index.html",O_RDONLY,S_IRUSR | S_IWUSR);
     struct stat sb;
 
@@ -38,7 +40,7 @@ void root_response(uint8_t sockfd){
     close(fd);
 };
 
-void js_response(uint8_t sockfd){
+void js_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
     uint8_t fd = open("../www/script.js",O_RDONLY,S_IRUSR | S_IWUSR);
     struct stat sb;
 
@@ -50,7 +52,7 @@ void js_response(uint8_t sockfd){
     close(fd);
 };
 
-void css_response(uint8_t sockfd){
+void css_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
     uint8_t fd = open("../www/style.css",O_RDONLY,S_IRUSR | S_IWUSR);
     struct stat sb;
 
@@ -62,7 +64,7 @@ void css_response(uint8_t sockfd){
     close(fd);
 };
 
-void png_response(uint8_t sockfd){
+void png_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
     // uint8_t fd = open("../www/water.png",O_RDONLY,S_IRUSR | S_IWUSR);
     FILE *fpng = fopen("../www/water.png","rb");
 
@@ -85,6 +87,22 @@ void png_response(uint8_t sockfd){
     // munmap(rfile,sb.st_size);
     
 };
+
+void device(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
+    if(GET==request){
+        // get dev data
+        uint8_t buffsend[2] = {0,0};
+        get_ble_data(buffsend,2);
+        response(sockfd,"200 OK",buffsend,2,"text");
+    }
+    else if(POST==request){
+        // send to dev
+        uint8_t data = 0;
+        push_ble_data(&data,1);
+        response(sockfd,"200 OK","",0,"text");
+    }
+}
+
 
 void init_routes(Route *init){
     for(uint8_t i = 0; i < MAX_ROUTES; i++){
@@ -124,8 +142,8 @@ uint8_t add_route(Route* new_route){
     return 0;
 };
 
-uint8_t call_route(char* addr,uint8_t sockfd){
+uint8_t call_route(char* addr,uint8_t sockfd,uint8_t request,uint8_t* request_content, size_t length_data){
     uint8_t hash = key(addr);
-    if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sockfd);
+    if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sockfd,request,request_content,length_data);
     return 0;
 };

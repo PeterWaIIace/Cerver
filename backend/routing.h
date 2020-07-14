@@ -23,6 +23,8 @@
 
 #include <time.h>
 
+#include "blesock.h"
+
 #define MAX_ROUTES 200
 #define MAX_ROUTE_LENGTH 30
 #define MAX_HEADER_LENGTH 300
@@ -52,22 +54,23 @@ struct Request{
 struct Route{
     int8_t empty; 
     char addr[MAX_ROUTE_LENGTH];
-    void (*fnc_ptr)(uint8_t sockfd); 
+    void (*fnc_ptr)(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data); 
 }typedef Route;
 
 Route *routes[MAX_ROUTES];
 
 Request get_REST(char* ptr);
 
-void bad_request(uint8_t sockfd);
-void root_response(uint8_t sockfd);
-void js_response(uint8_t sockfd);
-void css_response(uint8_t sockfd);
-void png_response(uint8_t sockfd);
+void bad_request(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
+void root_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
+void js_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
+void css_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
+void png_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
+void device(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data);
 
 void init_routes(Route *init);
 uint8_t add_route(Route* new_route);
-uint8_t call_route(char* addr,uint8_t sockfd);
+uint8_t call_route(char* addr,uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data);
 uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,char* content_type);
 uint8_t key(char* addr);
 

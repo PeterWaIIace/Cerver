@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
+#include <sys/un.h>
 
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -20,7 +21,10 @@
 
 #include <time.h>
 
+#include <pthread.h>
+
 #include "routing.h"
+#include "blesock.h"
 
 #define PORT 8080
 
@@ -36,23 +40,17 @@ uint32_t check(uint32_t err_code){ // if success -> check is transparent
     return err_code;
 }
 
-int main(int argc, char **argv){
-    clock_t start, end;
-    int sockfd, n,errcode,new_socket,opt=1; 
-    int sendbytes;
+int websock(){
+
+    int sockfd, conn_sock, opt=1;
     struct sockaddr_in servaddr;
     struct sockaddr_in destaddr;
 
     char sendline[BUFF_SIZE];
     char readline[BUFF_SIZE];
-
-    // usage check 
-    // if(argc != 2) 
-    //     return 0; 
+    //************************************ Socket init ********************************************//
 
     sockfd = socket(AF_INET,SOCK_STREAM,0);
-
-    // socket preparation
 
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -66,10 +64,8 @@ int main(int argc, char **argv){
     check(listen(sockfd,4));
 
     socklen_t cli_addr_size = sizeof(servaddr);
-    new_socket = check(accept(sockfd, &destaddr,&cli_addr_size));
+    conn_sock = check(accept(sockfd, &destaddr,&cli_addr_size));
  
-    printf("Connection from: %s \n",inet_ntoa(destaddr.sin_addr));
-
     // int flags = fcntl(sockfd,F_GETFL,0);
     // if(0 > (flags)){
     //     perror("flags");
@@ -78,6 +74,29 @@ int main(int argc, char **argv){
     // assert(flags != -1);
     // fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
 
+    printf("Connection from: %s \n",inet_ntoa(destaddr.sin_addr));
+
+    while(conn_sock > 0){
+
+        read(conn_sock , readline, BUFF_SIZE); 
+        
+        printf("%s\n",readline); 
+        Request req = get_REST(readline);
+        call_route(req.addr,conn_sock,req.request,req.data,req.length_data);
+        close(conn_sock);
+        conn_sock = accept(sockfd, &destaddr,&cli_addr_size);
+
+    }
+    
+    printf("Connection closed: %s \n",inet_ntoa(destaddr.sin_addr));
+ 
+}
+
+int main(int argc, char **argv){
+    // clock_t start, end;
+    // int sockfd, n,new_socket,opt=1; 
+    // int sendbytes;
+
     //************************************* Routes **********************************************//
 
     init_routes(&bad_route);
@@ -85,20 +104,9 @@ int main(int argc, char **argv){
     add_route(&route_js);
     add_route(&route_css);  
     add_route(&route_png); 
-    
-    while(new_socket > 0){
 
-        n = read(new_socket , readline, BUFF_SIZE); 
-        
-        printf("%s\n",readline); 
-        Request req = get_REST(readline);
-        call_route(req.addr,new_socket);
-        close(new_socket);
-        new_socket = accept(sockfd, &destaddr,&cli_addr_size);
-
-    }
-
-    printf("Connection closed: %s \n",inet_ntoa(destaddr.sin_addr));
+    start_unixsocket();
+    // websock();      
     
     return 0; 
 }
