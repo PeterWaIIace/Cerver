@@ -167,10 +167,25 @@ uint8_t add_route(Route* new_route){
     return 0;
 };
 
+uint8_t call_route(call_args* args){
+    
+    uint8_t sconn,request;
+    uint8_t *addr, *request_content;
+    size_t length_data;
 
-uint8_t call_route(char* addr,uint8_t sockfd,uint8_t request,uint8_t* request_content, size_t length_data){
-    uint8_t hash = key(request,addr);
-    if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sockfd,request,request_content,length_data);
+    request_content = malloc(args->length_data);
+    addr = malloc(args->length_addr);
+
+    sconn=args->sconn;
+    request=args->request; 
+    memcpy(addr,args->addr,args->length_addr);
+    memcpy(request_content,args->data,args->length_data);
+    length_data=args->length_data;
+    
+    uint8_t hash = key(request,addr);    
+    if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sconn,request,request_content,length_data);
+    
     free(request_content);
+    free(addr);
     return 0;
-};
+}

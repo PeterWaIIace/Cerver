@@ -29,7 +29,11 @@
 
 #define BUFF_SIZE 4096
 
+#define CONNECTIONS 100
+
 #define SOCK_ADDR struct sockaddr
+
+void * conn_hnld(call_args *thread_args);
 
 uint32_t check(uint32_t err_code){ // if success -> check is transparent
     if(err_code < 0){
@@ -60,36 +64,53 @@ int websock(){
 
     check(bind(sockfd,&servaddr,sizeof(servaddr)));
     
-    check(listen(sockfd,4));
+    check(listen(sockfd,CONNECTIONS));
 
     socklen_t cli_addr_size = sizeof(servaddr);
-    conn_sock = check(accept(sockfd, &destaddr,&cli_addr_size));
- 
-    // int flags = fcntl(sockfd,F_GETFL,0);
-    // if(0 > (flags)){
-    //     perror("flags");
-    //     exit(EXIT_FAILURE);  // 0 - success, -1 - fail
-    // }
-    // assert(flags != -1);
-    // fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+    // conn_sock = check(accept(sockfd, &destaddr,&cli_addr_size));
 
+ 
     printf("Connection from: %s \n",inet_ntoa(destaddr.sin_addr));
 
-    while(conn_sock > 0){
+    while(1){
 
+        conn_sock = accept(sockfd, &destaddr,&cli_addr_size);
         read(conn_sock , readline, BUFF_SIZE); 
         
         printf("%s\n",readline); 
         Request req = get_REST(readline);
-        call_route(req.addr,conn_sock,req.request,req.data,req.length_data);
-        close(conn_sock);
-        conn_sock = accept(sockfd, &destaddr,&cli_addr_size);
+        
+        // call_route(req.addr,conn_sock,req.request,req.data,req.length_data);
+        pthread_t p;
+
+        call_args *thread_args = malloc(sizeof(call_args));
+        thread_args->data = malloc(req.length_data);
+        thread_args->addr = malloc(req.length_addr);
+        
+        thread_args->sconn = conn_sock;
+        thread_args->request = req.request;
+        memcpy(thread_args->addr,req.addr,req.length_addr);
+        memcpy(thread_args->data,req.data,req.length_data);
+        
+        thread_args->length_addr=req.length_addr;
+        thread_args->length_data=req.length_data;
+        
+        pthread_create(&p,NULL,conn_hnld,thread_args);
 
     }
     
     printf("Connection closed: %s \n",inet_ntoa(destaddr.sin_addr));
  
 }
+
+void * conn_hnld(call_args *thread_args){
+    printf("\n\nhere\n\n'");
+    call_route(thread_args);
+    close(thread_args->sconn);
+    free(thread_args->data);
+    free(thread_args->addr);
+    free(thread_args);
+};
 
 int main(int argc, char **argv){
     // clock_t start, end;
