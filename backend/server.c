@@ -1,39 +1,45 @@
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <sys/un.h>
+#include "server.h"
 
-#include <sys/stat.h>
-#include <sys/mman.h>
+//************************************************* THREAD PART *********************************************************//
 
-#include <netdb.h>
-#include <netinet/in.h> 
+pthread_t thread_pool[THREADS_POOL];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+Queue threads_tasks;
 
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <fcntl.h>
+void conn_hnld(int socket){
+    uint8_t readline[BUFF_SIZE];
 
-#include <time.h>
+    read(socket , readline, BUFF_SIZE); 
+    printf("\n\n REQUEST: \n\n %s \n\n END OF REQUEST for socket: %d \n\n",readline,socket);
+    
+    Request req = get_REST(socket,readline);
+    
+    call_route(&req);
+    bzero(readline,BUFF_SIZE);
+    close(socket);
+}
 
-#include <pthread.h>
+void * _thread(){
+    int socket;
+    size_t size;
+    int8_t status_code;
 
-#include "routing.h"
+    while(1){
+        pthread_mutex_lock(&mutex);
+        status_code=queue_pull(&socket,&size,&threads_tasks);
+        if(QUEUE_EMPTY == status_code){
+            pthread_cond_wait(&cond,&mutex);
+            status_code=queue_pull(&socket,&size,&threads_tasks);
+        }
+        pthread_mutex_unlock(&mutex);
+        
+        if(QUEUE_EMPTY != status_code && NULL != socket){
+            conn_hnld(socket);        
+        }
+    }
 
-#define PORT 8080
-
-#define BUFF_SIZE 4096
-
-#define CONNECTIONS 100
-
-#define SOCK_ADDR struct sockaddr
-
-void * conn_hnld(call_args *thread_args);
+}
 
 uint32_t check(uint32_t err_code){ // if success -> check is transparent
     if(err_code < 0){
@@ -45,12 +51,13 @@ uint32_t check(uint32_t err_code){ // if success -> check is transparent
 
 int websock(){
 
-    int sockfd, conn_sock, opt=1;
+    int sockfd, opt=1;
+    
     struct sockaddr_in servaddr;
     struct sockaddr_in destaddr;
 
-    char sendline[BUFF_SIZE];
-    char readline[BUFF_SIZE];
+    // char sendline[BUFF_SIZE];
+
     //************************************ Socket init ********************************************//
 
     sockfd = socket(AF_INET,SOCK_STREAM,0);
@@ -67,67 +74,25 @@ int websock(){
     check(listen(sockfd,CONNECTIONS));
 
     socklen_t cli_addr_size = sizeof(servaddr);
-    // conn_sock = check(accept(sockfd, &destaddr,&cli_addr_size));
 
- 
     printf("Connection from: %s \n",inet_ntoa(destaddr.sin_addr));
+   
+    // Setting up threads pool
+    check(queue_init(&threads_tasks,1000));
+    
+    for(int n =0; n <THREADS_POOL;n++){
+        pthread_create(&thread_pool[n],NULL,_thread,NULL);
+    }
+
 
     while(1){
-
+        int conn_sock;
         conn_sock = accept(sockfd, &destaddr,&cli_addr_size);
-        read(conn_sock , readline, BUFF_SIZE); 
-        
-        printf("%s\n",readline); 
-        Request req = get_REST(readline);
-        
-        // call_route(req.addr,conn_sock,req.request,req.data,req.length_data);
-        pthread_t p;
-
-        call_args *thread_args = malloc(sizeof(call_args));
-        thread_args->data = malloc(req.length_data);
-        thread_args->addr = malloc(req.length_addr);
-        
-        thread_args->sconn = conn_sock;
-        thread_args->request = req.request;
-        memcpy(thread_args->addr,req.addr,req.length_addr);
-        memcpy(thread_args->data,req.data,req.length_data);
-        
-        thread_args->length_addr=req.length_addr;
-        thread_args->length_data=req.length_data;
-        
-        pthread_create(&p,NULL,conn_hnld,thread_args);
-
+        pthread_mutex_lock(&mutex);
+        queue_push(&conn_sock,sizeof(int),&threads_tasks);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&mutex);
+   
     }
     
-    printf("Connection closed: %s \n",inet_ntoa(destaddr.sin_addr));
- 
-}
-
-void * conn_hnld(call_args *thread_args){
-    printf("\n\nhere\n\n'");
-    call_route(thread_args);
-    close(thread_args->sconn);
-    free(thread_args->data);
-    free(thread_args->addr);
-    free(thread_args);
-};
-
-int main(int argc, char **argv){
-    // clock_t start, end;
-    // int sockfd, n,new_socket,opt=1; 
-    // int sendbytes;
-
-    //************************************* Routes **********************************************//
-
-    init_routes(&bad_route);
-    add_route(&route_root);
-    add_route(&route_js);
-    add_route(&route_css);  
-    add_route(&route_png); 
-    add_route(&route_post_data);
-    add_route(&route_get_data);
-
-    websock();      
-    
-    return 0; 
 }

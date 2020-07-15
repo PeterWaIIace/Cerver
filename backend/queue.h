@@ -9,6 +9,7 @@
 #define QUEUE_INITED 0
 #define QUEUE_NOT_INITED -1
 #define BUFF_SIZE 4096
+#define QUEUE_EMPTY -1
 
 typedef struct element{
     size_t size;
@@ -24,12 +25,10 @@ struct Queue{
     uint8_t init;
 }typedef Queue;
 
-;
-
 int8_t queue_init(Queue *ptr,uint16_t max_size);
 int8_t queue_if_init(Queue *ptr);
-int8_t queue_size(Queue *ptr);
-int8_t queue_push(uint8_t* buff,size_t size, Queue *ptr);
-int8_t queue_pull(uint8_t* read_val, size_t* size, Queue *ptr);
+uint8_t queue_size(Queue *ptr);
+int8_t queue_push(uint8_t *buff, size_t size, Queue *ptr);
+int8_t queue_pull(uint8_t *buff, size_t* size, Queue *ptr);
 
 #endif // __QUEUE_H__

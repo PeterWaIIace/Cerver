@@ -43,16 +43,8 @@ enum REST { FOREACH_REQ(GENERATE_ENUM) };
 
 static const char *REST_STRING[] = { FOREACH_REQ(ENUM2STR) };
 
-struct call_args{
-    uint8_t sconn;
-    uint8_t request;
-    uint8_t *data;
-    uint8_t *addr;
-    size_t length_data;
-    size_t length_addr;
-}typedef call_args;
-
 struct Request{
+    uint8_t sconn;
     uint8_t request;
     size_t length_addr;
     size_t length_data;
@@ -69,7 +61,7 @@ struct Route{
 
 Route *routes[MAX_ROUTES];
 
-Request get_REST(char* ptr);
+Request get_REST(uint8_t sock, char* ptr);
 
 void bad_request(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
 void root_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
@@ -82,8 +74,7 @@ Queue* data_queue;
 
 void init_routes(Route *init);
 uint8_t add_route(Route* new_route);
-// uint8_t call_route(char* addr,uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data);
-uint8_t call_route(call_args* args);
+uint8_t call_route(Request* req);
 uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,char* content_type);
 uint8_t key(uint8_t request,char* addr);
 uint8_t key2hash(char* input,size_t len);

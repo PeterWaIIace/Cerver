@@ -19,7 +19,6 @@ void root_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size
     struct stat sb;
 
     fstat(fd,&sb);
-    printf("ROOT:\n");
     char* rfile = mmap(NULL,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
     response(sockfd,"200 OK",rfile,sb.st_size,"text/html"); 
     munmap(rfile,sb.st_size);
@@ -76,33 +75,33 @@ void png_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_
 
 
 void get_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
-    if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
-        queue_init(&data_queue,200);
-    }
-    // get dev data
-    bzero(request_content,length_data);
-    queue_pull(request_content,&length_data,&data_queue);
+    // if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
+    //     queue_init(&data_queue,200);
+    // }
+    // // get dev data
+    // bzero(request_content,length_data);
+    // queue_pull(request_content,&length_data,&data_queue);
 
-    response(sockfd,"200 OK",request_content,length_data,"text");
+    response(sockfd,"200 OK","",0,"text");
     
 }
 
 void post_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
-    if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
-        queue_init(&data_queue,200);
-    }
+    // if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
+    //     queue_init(&data_queue,200);
+    // }
     
-    printf("post data: %s\n\n",request_content);
-    queue_push(request_content,length_data,&data_queue);
+    // printf("post data: %s\n\n",request_content);
+    // queue_push(request_content,length_data,&data_queue);
     
     response(sockfd,"200 OK","",0,"text");
 }
 
 /*                                    LIBRARY PART                                                  */
 
-Request get_REST(char* ptr){
+Request get_REST(uint8_t sock, char* ptr){
     Request req;
-    
+    req.sconn = sock;
     req.data=malloc(strlen(ptr));
     strncpy(req.data,ptr,strlen(ptr));
     req.length_data=strlen(ptr);
@@ -115,8 +114,9 @@ Request get_REST(char* ptr){
         }
     }
     req.request = n_req;
-    req.addr = strtok(NULL, " ");
-    req.length_addr = sizeof(req.addr);
+    req.addr = strtok(NULL," ");
+    printf("here %s %d\n\n",req.addr,strlen(req.addr));
+    req.length_addr = strlen(req.addr);
     return req;
 }
 
@@ -153,7 +153,7 @@ uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,
     
     memcpy(strsend, header,strlen(header));
     memcpy(strsend+strlen(header), content,content_size);
-    printf("%s\n",strsend);
+    printf("START OF RESPONSE \n%s\nEND OF RESPONSE socket %d \n\n",strsend,sockfd);
 
     write(sockfd , (uint8_t*)strsend, strlen(header)+content_size);
 }
@@ -167,25 +167,23 @@ uint8_t add_route(Route* new_route){
     return 0;
 };
 
-uint8_t call_route(call_args* args){
-    
+uint8_t call_route(Request* req){
     uint8_t sconn,request;
-    uint8_t *addr, *request_content;
+    uint8_t *request_content;
     size_t length_data;
-
-    request_content = malloc(args->length_data);
-    addr = malloc(args->length_addr);
-
-    sconn=args->sconn;
-    request=args->request; 
-    memcpy(addr,args->addr,args->length_addr);
-    memcpy(request_content,args->data,args->length_data);
-    length_data=args->length_data;
+    request_content = malloc(req->length_data);
+    length_data=req->length_data;
+    bzero(request_content,length_data);
     
-    uint8_t hash = key(request,addr);    
+    sconn=req->sconn;
+    request=req->request; 
+    
+    printf("addr %s %d\n\n",req->addr,req->length_addr);
+    memcpy(request_content,req->data,req->length_data);
+    
+    
+    uint8_t hash = key(request,req->addr);    
     if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sconn,request,request_content,length_data);
-    
     free(request_content);
-    free(addr);
     return 0;
 }

@@ -4,11 +4,11 @@ CFLAGS= -g
 
 all: backend 
 
-backend: server.c routing.c
-	${CC} ${CFLAGS} -pthread -o backend server.c routing.c queue.c  
+backend: main.c server.c routing.c queue.c
+	${CC} ${CFLAGS} -pthread -o backend main.c server.c routing.c queue.c  
 
-test: queue.c
-	${CC} ${CFLAGS} -o test queue.c
+# test: queue.c
+# 	${CC} ${CFLAGS} -o test queue.c
 
 clean:
 	rm -rf *.dSYM backend

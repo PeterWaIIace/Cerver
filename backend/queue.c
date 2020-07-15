@@ -15,23 +15,23 @@ int8_t queue_if_init(Queue *ptr){
     return QUEUE_NOT_INITED;
 }
 
-int8_t queue_size(Queue *ptr){
+uint8_t queue_size(Queue *ptr){
     return ptr->size;
 }
 
-int8_t queue_push(uint8_t* val, size_t size, Queue *ptr){
+int8_t queue_push(uint8_t *buff, size_t size, Queue *ptr){
     if(ptr->size == ptr->MAX_SIZE){
         uint8_t trash;
         size_t trash_size;
         queue_pull(&trash,&trash_size,ptr);       
     }
 
-    element *node = malloc(sizeof(element));
+    element *node=malloc(sizeof(node)); 
+    memcpy(node->value,buff,size);
     node->size = size;
-    memcpy(node->value,val,size);
 
     if(ptr->head==NULL) ptr->head=node;
-    if(ptr->tail==NULL) ptr->tail=node;
+    if(NULL == ptr->tail) ptr->tail=node;
    
     ptr->head->next = node;
     ptr->head=node;
@@ -39,24 +39,29 @@ int8_t queue_push(uint8_t* val, size_t size, Queue *ptr){
     return 0;
 }
 
-int8_t queue_pull(uint8_t* read_val, size_t* size,Queue *ptr){
-    if(ptr->tail == NULL) return -1;
-
-    memcpy(read_val,ptr->tail->value,ptr->tail->size);
-    *size = ptr->tail->size;
-    
-    if(ptr->tail == ptr->tail->next){
-        ptr->tail->next =NULL;
-        ptr->head = NULL;}
-    
-    printf("saved %s ptr %s size: %d\n",read_val,ptr->tail->value,*size);
-   
-    element *node = ptr->tail;
-    ptr->tail = ptr->tail->next;
-    free(node);
-    ptr->size -=1;
-   
-    return 0;
+int8_t queue_pull(uint8_t *buff, size_t* size, Queue *ptr){
+    if(0 >= queue_size(ptr)){
+        ptr->size=0;
+        buff=NULL;
+        size=0;
+        return -1;
+        }
+    else{
+        *size = ptr->tail->size;
+        memcpy(buff,ptr->tail->value,ptr->tail->size);
+        printf("socket in queue: %d\n\n",*buff);
+        if(ptr->tail == ptr->tail->next){
+            ptr->tail->next =NULL;
+            ptr->head = NULL;
+        }
+        
+        element *node;
+        node = ptr->tail;
+        ptr->tail = ptr->tail->next;
+        ptr->size -=1;
+        free(node);
+        return 0;
+    }
 }
 
 // int main(){
