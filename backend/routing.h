@@ -29,6 +29,10 @@
 #define MAX_HEADER_LENGTH 300
 #define MAX_REST_CMD_LENGTH 10
 
+#define ROUTE_EXISTS -1
+#define ROUTE_IS_FREE 0
+#define EMPTY_ROUTE "DEADBEEF"
+
 #define FOREACH_REQ(REQ) \
         REQ(GET)   \
         REQ(POST)  \
@@ -53,9 +57,8 @@ struct Request{
 }typedef Request;
 
 struct Route{
-    int8_t empty; 
     uint8_t request;
-    char addr[MAX_ROUTE_LENGTH];
+    char *addr;
     void (*fnc_ptr)(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data); 
 }typedef Route;
 
@@ -64,15 +67,8 @@ Route *routes[MAX_ROUTES];
 Request get_REST(uint8_t sock, char* ptr);
 
 void bad_request(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
-void root_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
-void js_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
-void css_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
-void png_response(uint8_t sockfd, uint8_t request, uint8_t* request_content,size_t length_data);
-void get_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data);
-void post_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data);
-Queue* data_queue;
 
-void init_routes(Route *init);
+void init_routes();
 uint8_t add_route(Route* new_route);
 uint8_t call_route(Request* req);
 uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,char* content_type);
@@ -80,11 +76,4 @@ uint8_t key(uint8_t request,char* addr);
 uint8_t key2hash(char* input,size_t len);
 
 extern Route bad_route;
-extern Route route_root;
-extern Route route_js;
-extern Route route_css;
-extern Route route_png;
-extern Route route_post_data;
-extern Route route_get_data;
-
 #endif

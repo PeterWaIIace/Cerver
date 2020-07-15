@@ -1,9 +1,10 @@
 #include "server.h"
 #include "routing.h"
+#include "routes.h"
 
 int main(int argc, char **argv){
     
-    init_routes(&bad_route);
+    init_routes();
     add_route(&route_root);
     add_route(&route_js);
     add_route(&route_css);  

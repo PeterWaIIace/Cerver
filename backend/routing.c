@@ -1,100 +1,10 @@
 #include "routing.h"
 
-Route bad_route = {.empty=-1, .request=GET , .addr="", .fnc_ptr=bad_request};
-Route route_root = {.empty=0, .request=GET , .addr="/", .fnc_ptr=root_response};
-Route route_js = {.empty=0,  .request=GET , .addr="/script.js", .fnc_ptr=js_response};
-Route route_css = {.empty=0, .request=GET , .addr="/style.css", .fnc_ptr=css_response};
-Route route_png = {.empty=0, .request=GET ,.addr="/water.png", .fnc_ptr=png_response};
-Route route_post_data = {.empty=0, .request=GET , .addr="/ReadDev", .fnc_ptr=get_data};
-Route route_get_data = {.empty=0, .request=POST , .addr="/ReadDev", .fnc_ptr=post_data};
-
+Route bad_route = {.request=GET , .addr=EMPTY_ROUTE, .fnc_ptr=bad_request}; // init route_css
 
 void bad_request(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
     printf("BAD REQUEST!:\n");
     response(sockfd,"404 NOT FOUND","",0,"text/html");
-}
-
-void root_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
-    uint8_t fd = open("../www/index.html",O_RDONLY,S_IRUSR | S_IWUSR);
-    struct stat sb;
-
-    fstat(fd,&sb);
-    char* rfile = mmap(NULL,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
-    response(sockfd,"200 OK",rfile,sb.st_size,"text/html"); 
-    munmap(rfile,sb.st_size);
-    close(fd);
-};
-
-void js_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
-    uint8_t fd = open("../www/script.js",O_RDONLY,S_IRUSR | S_IWUSR);
-    struct stat sb;
-
-    fstat(fd,&sb);
-    
-    char* rfile = mmap(NULL,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
-    response(sockfd,"200 OK",rfile,sb.st_size,"text/javascript"); 
-    munmap(rfile,sb.st_size);
-    close(fd);
-};
-
-void css_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
-    uint8_t fd = open("../www/style.css",O_RDONLY,S_IRUSR | S_IWUSR);
-    struct stat sb;
-
-    fstat(fd,&sb);
-    
-    char* rfile = mmap(NULL,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
-    response(sockfd,"200 OK",rfile,sb.st_size,"text/css"); 
-    munmap(rfile,sb.st_size);
-    close(fd);
-};
-
-void png_response(uint8_t sockfd,uint8_t request, uint8_t* request_content,size_t length_data){
-    // uint8_t fd = open("../www/water.png",O_RDONLY,S_IRUSR | S_IWUSR);
-    FILE *fpng = fopen("../www/water.png","rb");
-
-
-    fseek(fpng, 0, SEEK_END);
-    long fsize = ftell(fpng);
-    fseek(fpng, 0, SEEK_SET);  /* same as rewind(f); */
-
-    uint8_t *rpng = malloc(fsize + 1);
-    fread(rpng, 1, fsize, fpng);
-    fclose(fpng);
-
-    // struct stat sb;
-
-    // fstat(fd,&sb);
-    
-    // uint8_t* rfile = mmap(NULL,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
-    // response(sockfd,"200 OK",rfile,sb.st_size,"image/png"); 
-    response(sockfd,"200 OK",rpng,fsize,"image/png"); 
-    // munmap(rfile,sb.st_size);
-    
-};
-
-
-void get_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
-    // if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
-    //     queue_init(&data_queue,200);
-    // }
-    // // get dev data
-    // bzero(request_content,length_data);
-    // queue_pull(request_content,&length_data,&data_queue);
-
-    response(sockfd,"200 OK","",0,"text");
-    
-}
-
-void post_data(uint8_t sockfd,uint8_t request,uint8_t* request_content,size_t length_data){
-    // if(QUEUE_NOT_INITED == queue_if_init(&data_queue)){
-    //     queue_init(&data_queue,200);
-    // }
-    
-    // printf("post data: %s\n\n",request_content);
-    // queue_push(request_content,length_data,&data_queue);
-    
-    response(sockfd,"200 OK","",0,"text");
 }
 
 /*                                    LIBRARY PART                                                  */
@@ -118,13 +28,6 @@ Request get_REST(uint8_t sock, char* ptr){
     printf("here %s %d\n\n",req.addr,strlen(req.addr));
     req.length_addr = strlen(req.addr);
     return req;
-}
-
-void init_routes(Route *init){
-    for(uint8_t i = 0; i < MAX_ROUTES; i++){
-        routes[i]=init;
-    }
-
 }
 
 uint8_t key(uint8_t request,char* addr){
@@ -159,12 +62,33 @@ uint8_t response(uint8_t sockfd, char* code, char* content, size_t content_size,
 }
 
 
+void init_routes(){
+
+    for(uint8_t i = 0; i < MAX_ROUTES; i++){
+       
+        routes[i]=&bad_route;
+        
+    }
+}
+
 uint8_t add_route(Route* new_route){
-    if(new_route == NULL) return -1;
+    if(NULL == new_route) return ROUTE_EXISTS;
     uint8_t hash = key(new_route->request,new_route->addr);
-    if(routes[hash]->empty == 0) return -1;
-    routes[hash] = new_route;
-    return 0;
+    
+    if(0!=strncmp(routes[hash]->addr,EMPTY_ROUTE,strlen(EMPTY_ROUTE))){ // if hash is occupied find new one
+        for(uint8_t i =0;i < MAX_ROUTES; i++){
+            uint8_t try = (hash + i) % MAX_ROUTES;
+            if(0==strncmp(routes[try]->addr,EMPTY_ROUTE,strlen(EMPTY_ROUTE)))  
+                    routes[try] = new_route;
+                    return ROUTE_IS_FREE;
+        }
+        return ROUTE_EXISTS; // if all hashes are occupied - nothing to find
+    }
+    else{
+        routes[hash] = new_route;
+        return ROUTE_IS_FREE;
+    }
+    
 };
 
 uint8_t call_route(Request* req){
@@ -181,9 +105,24 @@ uint8_t call_route(Request* req){
     printf("addr %s %d\n\n",req->addr,req->length_addr);
     memcpy(request_content,req->data,req->length_data);
     
+    uint8_t call_bad_route = 1;
     
     uint8_t hash = key(request,req->addr);    
-    if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sconn,request,request_content,length_data);
+    if(0==strncmp(routes[hash]->addr,req->addr,strlen(req->addr))){ // if hash is occupied find new one
+        if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sconn,request,request_content,length_data);
+        call_bad_route = 0;
+    }
+    
+    else{
+        for(uint8_t i =0;i < MAX_ROUTES; i++){
+            uint8_t try = (hash + i) % MAX_ROUTES;
+            if(0==strncmp(routes[try]->addr,req->addr,strlen(req->addr))){
+                if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sconn,request,request_content,length_data);
+                call_bad_route = 0;
+            }
+        }
+    }
+    if(1 == call_bad_route)bad_route.fnc_ptr(sconn,request,request_content,length_data); // if hash doesnt lead to any route call bad route
     free(request_content);
     return 0;
 }
