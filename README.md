@@ -90,7 +90,7 @@ Server is starting when the ```websock``` is invoked.
 
 # Server
 
-![alt text](http://url/to/img.png)
+![alt text](hRouteExecutionProcess.png)
 
 Server is listening on port 8080 for incoming traffic. It can handle multiple connections, and for robustness purposes multithreading capabilities were added. 
 
