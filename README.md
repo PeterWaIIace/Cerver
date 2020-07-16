@@ -90,4 +90,8 @@ Server is starting when the ```websock``` is invoked.
 
 # Server
 
+![alt text](http://url/to/img.png)
 
+Server is listening on port 8080 for incoming traffic. It can handle multiple connections, and for robustness purposes multithreading capabilities were added. 
+
+Every incomming connection is accepted in main thread in ```websock``` function in ```server.c```. After accepting connection, socket id is pushed into mutexed queue and signal is send to inform (also in ```server.c```) threads in pool waiting for tasks. Every thread is reading connection from socket it got, next threads are parsing received message to get route, request command, and other necessary informations. Those information are passed to ```call_route``` in ```routing.c```. This allow to get information if route is in routes table (if not 404 is sent). If route is in routes table, the callback is invoked, and connection is closed and thread is returning to waiting mode.     
