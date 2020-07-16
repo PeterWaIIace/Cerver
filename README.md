@@ -94,6 +94,95 @@ Server is starting when the ```websock``` is invoked.
 
 Server is listening on port 8080 for incoming traffic. It can handle multiple connections, and for robustness purposes multithreading capabilities were added. 
 
-Every incomming connection is accepted in main thread in ```websock``` function in ```server.c```. After accepting connection, socket id is pushed into mutexed queue and signal is send to inform (also in ```server.c```) threads in pool waiting for tasks. Every thread is reading connection from socket it got, next threads are parsing received message to get route, request command, and other necessary informations. Those information are passed to ```call_route``` in ```routing.c```. This allow to get information if route is in routes table (if not 404 is sent). If route is in routes table, the callback is invoked, and connection is closed and thread is returning to waiting mode.  
+Every incomming connection is accepted in main thread in ```websock``` function in ```server.c```. 
 
+```
+int websock(){
+
+
+    [...]
+    
+    for(int n =0; n <THREADS_POOL;n++){
+        pthread_create(&thread_pool[n],NULL,_thread,NULL);
+    }
+
+    while(1){
+        int conn_sock;
+        conn_sock = accept(sockfd, &destaddr,&cli_addr_size);
+        pthread_mutex_lock(&mutex);
+        queue_push(&conn_sock,sizeof(int),&threads_tasks);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&mutex);
+   
+    }
+    
+}
+```
+
+After accepting connection, socket id is pushed into mutexed queue and signal is send to inform (also in ```server.c```) threads in pool waiting for tasks. 
+
+```
+void * _thread(){
+    [...]
+
+    while(1){
+        pthread_mutex_lock(&mutex);
+        status_code=queue_pull(&socket,&size,&threads_tasks);
+        if(QUEUE_EMPTY == status_code){
+            pthread_cond_wait(&cond,&mutex);
+            status_code=queue_pull(&socket,&size,&threads_tasks);
+        }
+        pthread_mutex_unlock(&mutex);
+        
+        if(QUEUE_EMPTY != status_code && NULL != socket){
+            conn_hnld(socket);        
+        }
+    }
+
+}
+```
+
+Every thread (in ```conn_hnld```) is reading connection from received socket, next received message is parsed to get route, request command, and other necessary informations.
+
+```
+void conn_hnld(int socket){
+    uint8_t readline[BUFF_SIZE];
+
+    read(socket , readline, BUFF_SIZE); 
+    printf("\n\n REQUEST: \n\n %s \n\n END OF REQUEST for socket: %d \n\n",readline,socket);
+    
+    Request req = get_REST(socket,readline);
+    
+    call_route(&req);
+    bzero(readline,BUFF_SIZE);
+    close(socket);
+}
+```
+
+Those information are passed to ```call_route``` in ```routing.c```. This allow to get information if route is in routes table (if not 404 is sent). If route is in routes table, the callback is invoked, and connection is closed and thread is returning to waiting mode. 
+
+````
+uint8_t call_route(Request* req){
+    
+    [...]
+    
+    uint8_t hash = key(request,req->addr);    
+    if(0==strncmp(routes[hash]->addr,req->addr,strlen(req->addr))){ // if hash is occupied find new one
+        if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sconn,request,request_content,length_data);
+        call_bad_route = 0;
+    }
+    else{
+        for(uint8_t i =0;i < MAX_ROUTES; i++){
+            uint8_t try = (hash + i) % MAX_ROUTES;
+            if(0==strncmp(routes[try]->addr,req->addr,strlen(req->addr))){
+                if(routes[hash]->fnc_ptr != NULL)routes[hash]->fnc_ptr(sconn,request,request_content,length_data);
+                call_bad_route = 0;
+            }
+        }
+    }
+    if(1 == call_bad_route)bad_route.fnc_ptr(sconn,request,request_content,length_data); // if hash doesnt lead to any route call bad route
+    free(request_content);
+    return 0;
+} 
+```
 This process is only thing the server is doing.   
