@@ -34,9 +34,7 @@ void * _thread(){
         }
         pthread_mutex_unlock(&mutex);
         
-        if(QUEUE_EMPTY != status_code && NULL != socket){
-            conn_hnld(socket);        
-        }
+        conn_hnld(socket);        
     }
 
 }
